@@ -1,17 +1,442 @@
-HTML
 <!DOCTYPE html>
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>マイホームページ</title>
+  <title>シンプルドキュメントビューア</title>
   <style>
-    body { font-family: sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; line-height: 1.6; }
-    h1 { color: #333; border-bottom: 2px solid #0366d6; padding-bottom: 10px; }
+    /* ==========================================================================
+       ベース設定・カスタムプロパティ（デザインシステム）
+       システムフォントのみを使用し、OSのダークモード設定にも自動対応します
+       ========================================================================== */
+    :root {
+      --bg-color: #f8fafc;
+      --surface-color: #ffffff;
+      --text-primary: #1e293b;
+      --text-secondary: #475569;
+      --accent-color: #2563eb;
+      --accent-hover: #1d4ed8;
+      --accent-soft: #eff6ff;
+      --border-color: #e2e8f0;
+      --nav-bg: rgba(255, 255, 255, 0.92);
+      --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05);
+      --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
+      --radius-lg: 16px;
+      --radius-full: 9999px;
+      /* OS標準の日本語・欧文システムフォントスタック */
+      --font-sans: -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic ProN", "Hiragino Sans", "BIZ UDPGothic", Meiryo, sans-serif;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg-color: #0f172a;
+        --surface-color: #1e293b;
+        --text-primary: #f1f5f9;
+        --text-secondary: #cbd5e1;
+        --accent-color: #3b82f6;
+        --accent-hover: #60a5fa;
+        --accent-soft: rgba(59, 130, 246, 0.15);
+        --border-color: #334155;
+        --nav-bg: rgba(30, 41, 59, 0.92);
+        --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+        --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.4);
+      }
+    }
+
+    /* リセットと基本レイアウト */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html {
+      scroll-behavior: smooth;
+      -webkit-text-size-adjust: 100%;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      background-color: var(--bg-color);
+      color: var(--text-primary);
+      line-height: 1.85;
+      /* 画面幅に応じて文字サイズを滑らかに調整（最小15px〜最大17px） */
+      font-size: clamp(0.9375rem, 0.9rem + 0.25vw, 1.0625rem);
+      /* 下部固定ナビゲーションに本文が隠れないよう十分な余白を確保 */
+      padding-bottom: calc(6.5rem + env(safe-area-inset-bottom, 0px));
+      min-height: 100vh;
+      transition: background-color 0.3s ease, color 0.3s ease;
+    }
+
+    /* ==========================================================================
+       レイアウトコンテナ（広い画面と狭い画面の両方で読みやすい幅に制限）
+       ========================================================================== */
+    .container {
+      width: 100%;
+      /* 1行あたり35〜45文字前後になる読みやすい最大幅（約720px） */
+      max-width: 45rem;
+      margin: 0 auto;
+      padding: clamp(1.25rem, 4vw, 2.5rem) clamp(1rem, 4vw, 1.5rem);
+    }
+
+    /* ヘッダー領域 */
+    .site-header {
+      margin-bottom: clamp(1.5rem, 4vw, 2.25rem);
+      padding-bottom: 1rem;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .site-title {
+      font-size: clamp(1.125rem, 1rem + 0.5vw, 1.35rem);
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+
+    .status-badge {
+      font-size: 0.8125rem;
+      font-weight: 600;
+      color: var(--accent-color);
+      background-color: var(--accent-soft);
+      padding: 0.25rem 0.75rem;
+      border-radius: var(--radius-full);
+      border: 1px solid transparent;
+    }
+
+    /* ==========================================================================
+       記事コンテンツカード（文章A・文章B・文章Cの表示領域）
+       ========================================================================== */
+    .article-card {
+      background-color: var(--surface-color);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+      padding: clamp(1.5rem, 5vw, 3rem);
+      box-shadow: var(--shadow-sm);
+      /* 状態切り替え時のフェードインアニメーション */
+      animation: fadeIn 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    /* 非表示状態の制御 */
+    .article-card[hidden] {
+      display: none;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(6px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .article-category {
+      display: inline-block;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--accent-color);
+      margin-bottom: 0.5rem;
+    }
+
+    .article-title {
+      font-size: clamp(1.375rem, 1.2rem + 1vw, 1.875rem);
+      font-weight: 700;
+      line-height: 1.4;
+      margin-bottom: 1.5rem;
+      letter-spacing: -0.01em;
+    }
+
+    .article-body p {
+      color: var(--text-secondary);
+      margin-bottom: 1.4em;
+      text-align: justify;
+      word-break: break-word;
+    }
+
+    .article-body p:last-child {
+      margin-bottom: 0;
+    }
+
+    .article-highlight {
+      background-color: var(--accent-soft);
+      border-left: 4px solid var(--accent-color);
+      padding: 1rem 1.25rem;
+      border-radius: 0 8px 8px 0;
+      margin: 1.5rem 0;
+      color: var(--text-primary);
+      font-size: 0.95em;
+    }
+
+    /* ==========================================================================
+       画面下部の固定ナビゲーションバー（3状態切り替えボタン）
+       ========================================================================== */
+    .bottom-nav-wrapper {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      display: flex;
+      justify-content: center;
+      padding: 0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom, 0px));
+      pointer-events: none; /* 背景部分のタップ透過 */
+    }
+
+    .bottom-nav {
+      pointer-events: auto;
+      display: flex;
+      align-items: center;
+      gap: 0.375rem;
+      width: 100%;
+      max-width: 28rem;
+      background-color: var(--nav-bg);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      padding: 0.375rem;
+      border-radius: var(--radius-full);
+      border: 1px solid var(--border-color);
+      box-shadow: var(--shadow-lg);
+    }
+
+    .nav-btn {
+      flex: 1;
+      appearance: none;
+      border: none;
+      background: transparent;
+      color: var(--text-secondary);
+      font-family: inherit;
+      font-size: clamp(0.875rem, 0.82rem + 0.25vw, 0.95rem);
+      font-weight: 600;
+      /* タッチ操作しやすい十分な高さ（44px以上）を確保 */
+      min-height: 2.75rem;
+      padding: 0.5rem 0.75rem;
+      border-radius: var(--radius-full);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .nav-btn:hover:not([aria-selected="true"]) {
+      color: var(--text-primary);
+      background-color: rgba(148, 163, 184, 0.12);
+    }
+
+    .nav-btn:focus-visible {
+      outline: 2px solid var(--accent-color);
+      outline-offset: 2px;
+    }
+
+    /* 選択中のボタンのスタイル */
+    .nav-btn[aria-selected="true"] {
+      background-color: var(--accent-color);
+      color: #ffffff;
+      box-shadow: 0 2px 8px rgba(37, 99, 235, 0.35);
+    }
+
+    /* 狭い画面（スマートフォン縦向きなど）向けの微調整 */
+    @media (max-width: 480px) {
+      .article-card {
+        border-radius: 12px;
+      }
+      .article-body p {
+        text-align: left; /* 狭い画面での不自然な単語間スペースを防止 */
+      }
+    }
   </style>
 </head>
 <body>
-  <h1>ようこそ！</h1>
-  <p>GitHub Pagesで作成したホームページです。</p>
+
+  <!-- メインコンテンツ領域 -->
+  <div class="container">
+    <header class="site-header">
+      <h1 class="site-title">ドキュメントビューア</h1>
+      <span id="current-status-label" class="status-badge" aria-live="polite">現在：文章Aを表示中</span>
+    </header>
+
+    <main id="main-content">
+      <!-- 状態1: 文章A（初期表示） -->
+      <article id="panel-a" class="article-card" role="tabpanel" aria-labelledby="tab-a">
+        <span class="article-category">State 01 / 概要とコンセプト</span>
+        <h2 class="article-title">文章A：シンプルさと可読性を追求した設計思想</h2>
+        <div class="article-body">
+          <p>
+            このページは、外部の画像ファイル、Webフォント、CSSフレームワーク、JavaScriptライブラリを一切使用せず、単一のHTMLファイルのみで構築されています。通信量を最小限に抑えながら、あらゆる環境で瞬時に表示される軽快な動作を実現しています。
+          </p>
+          <div class="article-highlight">
+            <strong>ポイント：</strong> 画面下部に固定された切り替えボタンを使うことで、ページを再読み込みすることなく「文章A」「文章B」「文章C」の各状態へ即座に移動できます。
+          </div>
+          <p>
+            広いデスクトップ画面では、1行あたりの文字数が長くなりすぎて視線が迷子にならないよう、読みやすい最大幅（約720px）にコンテンツを収めています。一方で、スマートフォンのような狭い画面では、画面端の余白と文字サイズを自動調整し、横スクロールなしで快適に読み進められます。
+          </p>
+          <p>
+            各OSに標準搭載されている日本語システムフォントを適切に指定しているため、追加のフォントデータをダウンロードすることなく、美しく整った文字組みで長文を読むことができます。
+          </p>
+        </div>
+      </article>
+
+      <!-- 状態2: 文章B -->
+      <article id="panel-b" class="article-card" role="tabpanel" aria-labelledby="tab-b" hidden>
+        <span class="article-category">State 02 / 技術仕様とレスポンシブ対応</span>
+        <h2 class="article-title">文章B：あらゆる画面サイズに適応するレイアウト技術</h2>
+        <div class="article-body">
+          <p>
+            現代のWeb閲覧環境は、大型のワイドモニターから片手で操作するコンパクトなスマートフォンまで多岐にわたります。本ページでは、CSSの <code>clamp()</code> 関数を活用し、画面幅の変化に合わせてフォントサイズや余白が滑らかに伸縮するように設計しています。
+          </p>
+          <p>
+            また、画面下部に配置されたナビゲーションバーは、親指が届きやすい位置に固定されています。コンテンツの最下部までスクロールした際にも、最後の段落がボタンの背後に隠れてしまわないよう、ページ全体に適切な下部余白（<code>padding-bottom</code>）とセーフエリア対応を組み込んでいます。
+          </p>
+          <div class="article-highlight">
+            <strong>アクセシビリティ配慮：</strong> タブ切り替えにはWAI-ARIA属性（<code>role="tablist"</code> / <code>aria-selected</code>）を付与しており、キーボード操作やスクリーンリーダーでも現在の状態を正確に把握できます。
+          </div>
+          <p>
+            さらに、お使いの端末がダークモードに設定されている場合は、背景色や文字色が自動的に目に優しいダークテーマへと切り替わります。
+          </p>
+        </div>
+      </article>
+
+      <!-- 状態3: 文章C -->
+      <article id="panel-c" class="article-card" role="tabpanel" aria-labelledby="tab-c" hidden>
+        <span class="article-category">State 03 / 活用例とカスタマイズ</span>
+        <h2 class="article-title">文章C：GitHub Pagesでの公開と応用アイデア</h2>
+        <div class="article-body">
+          <p>
+            このように外部依存のない単一HTMLファイルは、GitHub Pagesなどの静的ホスティングサービスとの相性が抜群です。ファイルを1つアップロードするだけでそのまま公開でき、リンク切れや外部サービスの停止による表示崩れの心配がありません。
+          </p>
+          <p>
+            3つの状態切り替え機能は、さまざまな用途に応用できます。たとえば、イベントの「開催概要・タイムテーブル・アクセス案内」を1ページにまとめたり、製品の「特徴・スペック・よくある質問」を切り替えたりする用途に最適です。
+          </p>
+          <div class="article-highlight">
+            <strong>カスタマイズ方法：</strong> HTML内の <code>&lt;article id="panel-a"&gt;</code> 〜 <code>panel-c</code> の中身を書き換えるだけで、お好みの文章やリスト、表などを自由に掲載できます。
+          </div>
+          <p>
+            ページ遷移の待ち時間がないため、閲覧者はストレスなく複数の情報を行き来でき、必要な情報へ素早くたどり着くことができます。ぜひ用途に合わせて内容を編集してみてください。
+          </p>
+        </div>
+      </article>
+    </main>
+  </div>
+
+  <!-- 画面下部の状態切り替えナビゲーション -->
+  <div class="bottom-nav-wrapper">
+    <nav class="bottom-nav" role="tablist" aria-label="表示する文章の切り替え">
+      <button
+        type="button"
+        id="tab-a"
+        class="nav-btn"
+        role="tab"
+        aria-selected="true"
+        aria-controls="panel-a"
+        data-target="a"
+      >
+        文章A
+      </button>
+      <button
+        type="button"
+        id="tab-b"
+        class="nav-btn"
+        role="tab"
+        aria-selected="false"
+        aria-controls="panel-b"
+        data-target="b"
+      >
+        文章B
+      </button>
+      <button
+        type="button"
+        id="tab-c"
+        class="nav-btn"
+        role="tab"
+        aria-selected="false"
+        aria-controls="panel-c"
+        data-target="c"
+      >
+        文章C
+      </button>
+    </nav>
+  </div>
+
+  <script>
+    /**
+     * 3つの状態（文章A・文章B・文章C）を切り替える制御スクリプト
+     */
+    (function () {
+      'use strict';
+
+      // DOM要素の取得
+      const buttons = document.querySelectorAll('.nav-btn');
+      const statusLabel = document.getElementById('current-status-label');
+
+      // 状態ごとのパネルとラベルの定義
+      const states = {
+        a: {
+          panel: document.getElementById('panel-a'),
+          label: '現在：文章Aを表示中'
+        },
+        b: {
+          panel: document.getElementById('panel-b'),
+          label: '現在：文章Bを表示中'
+        },
+        c: {
+          panel: document.getElementById('panel-c'),
+          label: '現在：文章Cを表示中'
+        }
+      };
+
+      /**
+       * 指定された状態キー（'a' | 'b' | 'c'）へ表示を切り替える
+       * @param {string} targetKey - 遷移先の状態キー
+       */
+      function switchState(targetKey) {
+        if (!states[targetKey]) return;
+
+        // 1. ボタンの選択状態を更新
+        buttons.forEach((btn) => {
+          const isSelected = btn.dataset.target === targetKey;
+          btn.setAttribute('aria-selected', String(isSelected));
+        });
+
+        // 2. 各文章パネルの表示・非表示を切り替え
+        Object.keys(states).forEach((key) => {
+          const panel = states[key].panel;
+          if (key === targetKey) {
+            panel.hidden = false;
+          } else {
+            panel.hidden = true;
+          }
+        });
+
+        // 3. ヘッダーのステータス表示を更新
+        if (statusLabel) {
+          statusLabel.textContent = states[targetKey].label;
+        }
+
+        // 4. ページ上部へスムーズにスクロール（長文を途中まで読んだ後の切り替えに配慮）
+        window.scrollTo({
+          top: 0,
+          behavior: 'smooth'
+        });
+      }
+
+      // 各ボタンにクリックイベントを登録
+      buttons.forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const targetKey = btn.dataset.target;
+          switchState(targetKey);
+        });
+      });
+    })();
+  </script>
 </body>
 </html>
